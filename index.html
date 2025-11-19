@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IFSC Official Speed Route Simulator</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #b0c4de; }
+        
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Top Info */
+        #header-info {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px 40px;
+            align-items: flex-start;
+        }
+
+        /* Timer */
+        #timer-box {
+            text-align: right;
+        }
+        #timer {
+            font-size: 80px;
+            font-weight: 900;
+            color: #ffdf00;
+            text-shadow: 4px 4px 0px rgba(0,0,0,0.5);
+            font-family: 'Courier New', monospace;
+            line-height: 1;
+        }
+        .label { font-size: 14px; color: #fff; text-transform: uppercase; letter-spacing: 2px; font-weight: bold; opacity: 0.8; }
+
+        /* Input Interface */
+        #input-zone {
+            position: absolute;
+            bottom: 60px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 20px;
+        }
+
+        #current-row-container {
+            background: rgba(20, 20, 35, 0.85);
+            padding: 15px 30px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            transform: translateY(0);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #input-label { color: #aaa; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+
+        #current-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .key-box {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            font-weight: bold;
+            transition: all 0.1s;
+        }
+
+        .key-box.active {
+            border-color: #ff4d4d;
+            background: #ff4d4d;
+            color: #fff;
+            transform: scale(1.15);
+            box-shadow: 0 0 20px rgba(255, 77, 77, 0.6);
+        }
+        
+        .key-box.done {
+            background: #4caf50;
+            border-color: #4caf50;
+            transform: scale(0.8);
+            opacity: 0.5;
+        }
+
+        /* Next Sequence Preview */
+        #preview-container {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(5px);
+            transition: opacity 0.3s;
+        }
+        
+        #preview-row { display: flex; gap: 6px; margin-top: 5px; }
+        .preview-key {
+            width: 25px; height: 25px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.3);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; color: rgba(255,255,255,0.8);
+        }
+
+        /* Menu Screen */
+        #menu-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(15px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            pointer-events: auto;
+            z-index: 20;
+        }
+
+        h1 { 
+            font-size: 72px; margin: 0; 
+            background: linear-gradient(to right, #ff4d4d, #ffdf00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-style: italic;
+            text-transform: uppercase;
+        }
+        
+        .subtitle { font-size: 24px; color: #94a3b8; margin-bottom: 50px; letter-spacing: 3px; }
+
+        button {
+            padding: 20px 60px;
+            font-size: 28px;
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 900;
+            text-transform: uppercase;
+            border-radius: 8px;
+            box-shadow: 0 10px 0 #cc0000;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 12px 0 #cc0000; background: #ff6666; }
+        button:active { transform: translateY(4px); box-shadow: 0 0 0 #cc0000; }
+
+        .controls-hint { margin-top: 30px; font-size: 16px; color: #64748b; }
+
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <div id="header-info">
+            <div>
+                <div class="label">Current Height</div>
+                <div style="font-size:32px; font-weight:bold; color:white"><span id="height-display">0.0</span>m</div>
+            </div>
+            <div id="timer-box">
+                <div class="label">Time</div>
+                <div id="timer">0.000</div>
+            </div>
+        </div>
+
+        <div id="input-zone">
+            <div id="current-row-container">
+                <div id="input-label">Move Sequence</div>
+                <div id="current-row">
+                    <!-- Keys Injected Here -->
+                </div>
+            </div>
+        </div>
+
+        <div id="preview-container">
+            <div class="label" style="font-size:10px">Next Batch</div>
+            <div id="preview-row"></div>
+        </div>
+    </div>
+
+    <div id="menu-screen">
+        <h1>Speed Record</h1>
+        <div class="subtitle">IFSC Official 15m Standard</div>
+        <p id="status-text" style="font-size: 18px; color: #ccc; margin-bottom: 30px;">挑戰奧運標準賽道配置</p>
+        <button id="start-btn">Start Climb</button>
+        <div class="controls-hint">Use Arrow Keys <span style="color:#fff">↑ ↓ ← →</span></div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- IFSC Official Specs Simulation Data ---
+        const IFSC_SPECS = {
+            wallHeight: 15, // meters
+            panelSize: 1.5, // meters
+            gridSpacing: 0.125, // meters (125mm)
+            overhangAngle: 5 * (Math.PI / 180), // 5 degrees
+            colors: {
+                wall: 0x808080, // Light Grey (Official RAL 7035 approx)
+                hold: 0xff0000, // Official Red
+                floor: 0x222222
+            }
+        };
+
+        // Approximate coordinates based on Official Route Map (DX=Right Panel, SN=Left Panel)
+        // Format: { type: 'hand'|'foot', panelSide: 'SN'|'DX', panelIdx: 1-10, col: 'A'-'K', row: 1-10 }
+        // Note: This is a simplified replica of the "Standard Speed Route" logic
+        const OFFICIAL_ROUTE_DATA = [
+            // Start
+            { t:'foot', p:'DX', pi:1, c:'G', r:4 }, 
+            { t:'foot', p:'DX', pi:1, c:'B', r:10 },
+            // The main sequence (Approximate path up the wall)
+            { t:'hand', p:'DX', pi:2, c:'D', r:3 }, // 1
+            { t:'hand', p:'DX', pi:2, c:'E', r:5 }, // 2
+            { t:'hand', p:'DX', pi:2, c:'C', r:10 }, // 3
+            { t:'hand', p:'SN', pi:3, c:'G', r:4 }, // 4
+            { t:'hand', p:'SN', pi:3, c:'I', r:8 }, // 5
+            { t:'hand', p:'DX', pi:4, c:'D', r:3 }, // 6
+            { t:'hand', p:'SN', pi:4, c:'L', r:10 }, // 7
+            { t:'hand', p:'DX', pi:5, c:'C', r:6 }, // 8
+            { t:'hand', p:'DX', pi:5, c:'H', r:9 }, // 9
+            { t:'hand', p:'SN', pi:6, c:'E', r:2 }, // 10
+            { t:'hand', p:'SN', pi:6, c:'M', r:9 }, // 11 (M is virtual extended grid on wide walls, mapping to near edge)
+            { t:'hand', p:'SN', pi:6, c:'F', r:9 }, // 12
+            { t:'hand', p:'SN', pi:7, c:'A', r:5 }, // 13
+            { t:'hand', p:'SN', pi:7, c:'E', r:8 }, // 14
+            { t:'hand', p:'SN', pi:8, c:'L', r:1 }, // 15
+            { t:'hand', p:'SN', pi:8, c:'I', r:3 }, // 16
+            { t:'hand', p:'SN', pi:8, c:'C', r:8 }, // 17
+            { t:'hand', p:'SN', pi:9, c:'M', r:10 }, // 18
+            { t:'hand', p:'DX', pi:9, c:'C', r:4 }, // 19
+            { t:'hand', p:'DX', pi:9, c:'E', r:9 }, // 20
+            { t:'finish', p:'DX', pi:10, c:'B', r:9 } // Top Button
+        ];
+
+        // Convert Grid 'A'-'K' to index 0-10
+        const colMap = char => char.charCodeAt(0) - 65;
+
+        class ClimbingGame {
+            constructor() {
+                this.container = document.getElementById('canvas-container');
+                
+                // Core
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x87CEEB); // Sky Blue
+                this.scene.fog = new THREE.Fog(0x87CEEB, 10, 50);
+                
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+                this.camera.position.set(1.5, -3, 10); // Centered on width
+                
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.container.appendChild(this.renderer.domElement);
+
+                // Game State
+                this.routeHolds = []; // Stores 3D positions of the route
+                this.generatedSequence = []; // The arrow keys mapped to route
+                this.currentIndex = 0;
+                this.startTime = 0;
+                this.timerInterval = null;
+                this.isPlaying = false;
+                
+                this.playerGroup = null;
+                this.limbs = {};
+                this.targetY = 0;
+                this.currentHeight = 0;
+
+                // Init
+                this.setupLights();
+                this.createEnvironment();
+                this.createPlayer();
+                this.processRoute(); // Generate physics positions from data
+                this.generateInputs(); // Generate random arrows for gameplay
+                
+                // UI Refs
+                this.ui = {
+                    timer: document.getElementById('timer'),
+                    height: document.getElementById('height-display'),
+                    row: document.getElementById('current-row'),
+                    rowContainer: document.getElementById('current-row-container'),
+                    preview: document.getElementById('preview-row'),
+                    menu: document.getElementById('menu-screen'),
+                    status: document.getElementById('status-text'),
+                    startBtn: document.getElementById('start-btn')
+                };
+
+                this.addEvents();
+                this.animate = this.animate.bind(this);
+                requestAnimationFrame(this.animate);
+
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+
+            setupLights() {
+                const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+                this.scene.add(ambient);
+
+                const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+                dirLight.position.set(10, 20, 20);
+                dirLight.castShadow = true;
+                dirLight.shadow.mapSize.width = 2048;
+                dirLight.shadow.mapSize.height = 2048;
+                dirLight.shadow.camera.top = 20;
+                dirLight.shadow.camera.bottom = -5;
+                dirLight.shadow.camera.left = -10;
+                dirLight.shadow.camera.right = 10;
+                this.scene.add(dirLight);
+            }
+
+            createTomahawkHold(isHand) {
+                // Recreating the Official IFSC Hold Shape (Abstracted)
+                // Red color, "X" or Star like shape with a ball
+                const material = new THREE.MeshStandardMaterial({ 
+                    color: IFSC_SPECS.colors.hold, 
+                    roughness: 0.4,
+                    metalness: 0.1
+                });
+
+                const group = new THREE.Group();
+
+                if (isHand) {
+                    // Central mount
+                    const center = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.05, 16), material);
+                    center.rotation.x = Math.PI / 2;
+                    group.add(center);
+
+                    // The "Ball" part
+                    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 16), material);
+                    ball.position.set(0, 0.12, 0.05);
+                    group.add(ball);
+
+                    // The "Tail" part (Handle)
+                    const tailGeo = new THREE.ConeGeometry(0.06, 0.3, 16);
+                    const tail = new THREE.Mesh(tailGeo, material);
+                    tail.position.set(0, -0.15, 0.02);
+                    tail.rotation.x = -0.2;
+                    group.add(tail);
+
+                    // Side wings (Star shape feel)
+                    const wingGeo = new THREE.BoxGeometry(0.3, 0.1, 0.1);
+                    const wing = new THREE.Mesh(wingGeo, material);
+                    wing.position.set(0, 0, 0);
+                    group.add(wing);
+
+                    group.scale.setScalar(1.5); // Adjust scale to be visible
+                } else {
+                    // Foot hold is smaller, simple button
+                    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 0.05, 16), material);
+                    foot.rotation.x = Math.PI / 2;
+                    group.add(foot);
+                }
+
+                group.castShadow = true;
+                group.receiveShadow = true;
+                return group;
+            }
+
+            createEnvironment() {
+                // 1. Floor
+                const floor = new THREE.Mesh(
+                    new THREE.PlaneGeometry(50, 50),
+                    new THREE.MeshStandardMaterial({ color: IFSC_SPECS.colors.floor, roughness: 0.8 })
+                );
+                floor.rotation.x = -Math.PI / 2;
+                floor.receiveShadow = true;
+                this.scene.add(floor);
+
+                // 2. The Wall (15m high, 3m wide per lane - simulating 1 lane here = 3m)
+                // Inclined by 5 degrees
+                const wallWidth = 3.0; // 2 panels (SN + DX)
+                const wallHeight = IFSC_SPECS.wallHeight;
+                
+                const wallGeo = new THREE.BoxGeometry(wallWidth, wallHeight + 1, 0.2);
+                const wallMat = new THREE.MeshStandardMaterial({ 
+                    color: IFSC_SPECS.colors.wall, 
+                    roughness: 0.9 
+                });
+                
+                this.wallGroup = new THREE.Group();
+                const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+                wallMesh.position.y = wallHeight / 2;
+                wallMesh.receiveShadow = true;
+                
+                this.wallGroup.add(wallMesh);
+                
+                // Apply 5 degree overhang rotation
+                // Pivot is at bottom (0,0,0) roughly
+                this.wallGroup.rotation.x = -IFSC_SPECS.overhangAngle;
+                this.scene.add(this.wallGroup);
+
+                // 3. Panel Dividers (Visual only)
+                // Draw lines every 1.5m
+                for (let i = 1; i <= 10; i++) {
+                    const y = i * 1.5;
+                    const lineGeo = new THREE.BoxGeometry(3.0, 0.02, 0.21);
+                    const line = new THREE.Mesh(lineGeo, new THREE.MeshBasicMaterial({ color: 0x666666 }));
+                    line.position.set(0, y, 0);
+                    this.wallGroup.add(line);
+                }
+                // Vertical divider
+                const vLine = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.02, wallHeight, 0.21),
+                    new THREE.MeshBasicMaterial({ color: 0x666666 })
+                );
+                vLine.position.set(0, wallHeight/2, 0);
+                this.wallGroup.add(vLine);
+            }
+
+            processRoute() {
+                // Convert data to 3D positions
+                OFFICIAL_ROUTE_DATA.forEach((item) => {
+                    // Panel logic
+                    // SN is left (-1.5 to 0), DX is right (0 to 1.5)
+                    // Center of wall is 0.
+                    // SN Panel Center = -0.75, DX Panel Center = +0.75
+                    // But grid starts from left edge of panel.
+                    
+                    let panelOffsetX = (item.p === 'SN') ? -1.5 : 0; // Left edge of specific panel relative to wall center (assuming wall is -1.5 to 1.5)
+                    // Actually let's assume wall x goes from 0 to 3 for easier math, then center later.
+                    // Let's stick to wall centered at 0. Width 3. Left edge -1.5.
+                    // SN Panel: x range -1.5 to 0. Grid A is at -1.5 + margin.
+                    // DX Panel: x range 0 to 1.5. Grid A is at 0 + margin.
+                    
+                    let xBase = (item.p === 'SN') ? -1.5 : 0;
+                    
+                    // Grid Col (A=0, B=1...) * 0.125
+                    let cIdx = colMap(item.c);
+                    let xPos = xBase + (cIdx * IFSC_SPECS.gridSpacing) + 0.125; // + margin roughly
+
+                    // Grid Row (1=0, 2=1...) * 0.125
+                    // Panel Index (1..10)
+                    let yBase = (item.pi - 1) * IFSC_SPECS.panelSize;
+                    let rIdx = item.r - 1;
+                    let yPos = yBase + (rIdx * IFSC_SPECS.gridSpacing) + 0.125;
+
+                    // Create Visual Hold
+                    const holdMesh = this.createTomahawkHold(item.t === 'hand' || item.t === 'finish');
+                    holdMesh.position.set(xPos, yPos, 0.1);
+                    holdMesh.rotation.z = Math.random() * Math.PI * 2; // Random rotation for variety, official is specific but this is enough
+                    this.wallGroup.add(holdMesh);
+
+                    if (item.t === 'finish') {
+                        // Make it a big button
+                        const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.1, 32), new THREE.MeshStandardMaterial({color: 0xffff00, emissive: 0xaa8800}));
+                        btn.rotation.x = Math.PI/2;
+                        btn.position.set(xPos, yPos, 0.15);
+                        this.wallGroup.add(btn);
+                    }
+
+                    // Store for gameplay
+                    // Save global world height (approximation considering incline)
+                    this.routeHolds.push({
+                        x: xPos,
+                        y: yPos,
+                        type: item.t
+                    });
+                });
+            }
+
+            createPlayer() {
+                this.playerGroup = new THREE.Group();
+                
+                // Low Poly Speed Climber
+                const matBody = new THREE.MeshStandardMaterial({ color: 0x333333 }); // Black suit
+                const matSkin = new THREE.MeshStandardMaterial({ color: 0xffccaa });
+                const matJersey = new THREE.MeshStandardMaterial({ color: 0xff4d4d }); // Country color
+
+                // Torso
+                const torso = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.6, 0.2), matJersey);
+                torso.position.y = 1.3;
+                this.playerGroup.add(torso);
+
+                // Head
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 0.25), matSkin);
+                head.position.y = 1.8;
+                this.playerGroup.add(head);
+
+                // Function to make limbs
+                const makeLimb = (w, h, x, y, name) => {
+                    const g = new THREE.Group();
+                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.15), (name.includes('Arm')?matSkin:matBody));
+                    mesh.position.y = -h/2;
+                    g.add(mesh);
+                    g.position.set(x, y, 0);
+                    this.playerGroup.add(g);
+                    this.limbs[name] = g;
+                };
+
+                makeLimb(0.1, 0.5, -0.25, 1.6, 'LA'); // Left Arm
+                makeLimb(0.1, 0.5, 0.25, 1.6, 'RA');
+                makeLimb(0.12, 0.6, -0.15, 1.0, 'LL'); // Left Leg
+                makeLimb(0.12, 0.6, 0.15, 1.0, 'RL');
+
+                // Default Pose
+                this.limbs.LA.rotation.z = 2.5;
+                this.limbs.RA.rotation.z = -2.5;
+
+                // Initial pos
+                this.playerGroup.position.set(0, 0, 0.5);
+                this.playerGroup.rotation.x = -IFSC_SPECS.overhangAngle; // Match wall angle
+                this.scene.add(this.playerGroup);
+            }
+
+            generateInputs() {
+                this.generatedSequence = [];
+                const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+                // Map one input per hold in the route data
+                // Note: Real speed climbing has about 20 hand holds. 
+                // We will just map 1 key press per hold to climb it.
+                this.routeHolds.forEach(() => {
+                    this.generatedSequence.push(keys[Math.floor(Math.random() * keys.length)]);
+                });
+            }
+
+            // --- Game Logic ---
+            
+            startGame() {
+                this.currentIndex = 0;
+                this.playerGroup.position.y = 0;
+                this.playerGroup.position.x = 0;
+                this.targetY = 0;
+                this.currentHeight = 0;
+                
+                this.isPlaying = true;
+                this.ui.menu.style.display = 'none';
+                this.startTime = Date.now();
+                
+                this.renderUI();
+                
+                if(this.timerInterval) clearInterval(this.timerInterval);
+                this.timerInterval = setInterval(() => {
+                    const t = (Date.now() - this.startTime) / 1000;
+                    this.ui.timer.innerText = t.toFixed(3);
+                }, 16);
+            }
+
+            endGame() {
+                this.isPlaying = false;
+                clearInterval(this.timerInterval);
+                const t = this.ui.timer.innerText;
+                this.ui.status.innerHTML = `Final Time: <span style="color:#ffdf00; font-size:40px; font-weight:bold">${t}s</span><br>World Record Pace!`;
+                this.ui.startBtn.innerText = "Climb Again";
+                this.ui.menu.style.display = 'flex';
+            }
+
+            addEvents() {
+                this.ui.startBtn.addEventListener('click', () => this.startGame());
+                
+                window.addEventListener('keydown', (e) => {
+                    if(!this.isPlaying) return;
+                    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) {
+                        const targetKey = this.generatedSequence[this.currentIndex];
+                        
+                        if(e.code === targetKey) {
+                            this.handleSuccess();
+                        } else {
+                            // Penalty: Stumble
+                            this.playerGroup.position.x += (Math.random()-0.5)*0.5;
+                            this.ui.rowContainer.style.transform = "translateY(10px)";
+                            setTimeout(() => this.ui.rowContainer.style.transform = "translateY(0)", 100);
+                        }
+                    }
+                });
+            }
+
+            handleSuccess() {
+                const holds = this.routeHolds;
+                
+                // Update UI
+                this.markKeyDone(this.currentIndex);
+                
+                this.currentIndex++;
+                
+                // Calculate Movement
+                if (this.currentIndex < holds.length) {
+                    const nextHold = holds[this.currentIndex];
+                    // Move player towards this hold's Y
+                    this.targetY = nextHold.y;
+                    // Also move X to match hold (with some smoothing in animate)
+                    // But we keep player slightly offset
+                } else {
+                    // Finished
+                    this.targetY = IFSC_SPECS.wallHeight;
+                    this.endGame();
+                }
+
+                // Check for UI Page Turn (Every 5 items)
+                if (this.currentIndex % 5 === 0) {
+                    this.renderUI();
+                }
+
+                // Animation Trigger
+                this.animateClimbMotion();
+            }
+
+            animateClimbMotion() {
+                // Procedural limb animation
+                const t = this.currentIndex % 2 === 0;
+                this.limbs.LA.rotation.z = t ? 2.8 : 0.5;
+                this.limbs.RA.rotation.z = t ? 0.5 : -2.8;
+                this.limbs.LL.rotation.x = t ? 0.8 : 0;
+                this.limbs.RL.rotation.x = t ? 0 : 0.8;
+            }
+
+            // --- UI Rendering ---
+
+            getKeySymbol(code) {
+                const map = {'ArrowUp':'↑', 'ArrowDown':'↓', 'ArrowLeft':'←', 'ArrowRight':'→'};
+                return map[code];
+            }
+
+            renderUI() {
+                const CHUNK_SIZE = 5;
+                const page = Math.floor(this.currentIndex / CHUNK_SIZE);
+                const start = page * CHUNK_SIZE;
+                const end = start + CHUNK_SIZE;
+                
+                // Render Current Row
+                this.ui.row.innerHTML = '';
+                const currentSlice = this.generatedSequence.slice(start, end);
+                
+                currentSlice.forEach((key, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'key-box';
+                    div.innerText = this.getKeySymbol(key);
+                    div.id = `key-${start + i}`;
+                    
+                    // If already done in this batch (shouldn't happen on fresh render, but just in case logic changes)
+                    if(start + i < this.currentIndex) {
+                        div.classList.add('done');
+                    } else if(start + i === this.currentIndex) {
+                        div.classList.add('active');
+                    }
+                    
+                    this.ui.row.appendChild(div);
+                });
+
+                // Render Preview
+                this.ui.preview.innerHTML = '';
+                const nextSlice = this.generatedSequence.slice(end, end + CHUNK_SIZE);
+                if(nextSlice.length > 0) {
+                    nextSlice.forEach(key => {
+                        const div = document.createElement('div');
+                        div.className = 'preview-key';
+                        div.innerText = this.getKeySymbol(key);
+                        this.ui.preview.appendChild(div);
+                    });
+                    document.getElementById('preview-container').style.opacity = 1;
+                } else {
+                    document.getElementById('preview-container').style.opacity = 0;
+                }
+            }
+
+            markKeyDone(index) {
+                const el = document.getElementById(`key-${index}`);
+                if(el) {
+                    el.classList.remove('active');
+                    el.classList.add('done');
+                    
+                    const nextEl = document.getElementById(`key-${index+1}`);
+                    if(nextEl) nextEl.classList.add('active');
+                }
+            }
+
+            animate() {
+                requestAnimationFrame(this.animate);
+
+                if(this.playerGroup) {
+                    // Physics: Smooth Lerp
+                    this.playerGroup.position.y += (this.targetY - this.playerGroup.position.y) * 0.15;
+                    
+                    // X Movement: Lerp towards current hold x
+                    if(this.currentIndex < this.routeHolds.length) {
+                        const targetX = this.routeHolds[this.currentIndex].x;
+                        this.playerGroup.position.x += (targetX - this.playerGroup.position.x) * 0.1;
+                    }
+
+                    // Camera Follow
+                    const camTargetY = Math.min(this.playerGroup.position.y + 2, IFSC_SPECS.wallHeight + 2);
+                    this.camera.position.y += (camTargetY - this.camera.position.y) * 0.1;
+                    this.camera.lookAt(0, this.camera.position.y + 2, -5); // Look slightly up at wall
+                    
+                    // Update Height UI
+                    this.currentHeight = this.playerGroup.position.y;
+                    this.ui.height.innerText = Math.min(this.currentHeight, 15.0).toFixed(1);
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        new ClimbingGame();
+
+    </script>
+</body>
+</html>
