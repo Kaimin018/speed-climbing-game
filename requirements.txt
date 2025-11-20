@@ -1,0 +1,5 @@
+# Python 依賴套件
+# 目前此專案為純前端專案，無需額外 Python 套件
+# 如需安裝套件，請使用以下格式：
+# package-name==version
+

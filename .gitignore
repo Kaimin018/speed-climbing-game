@@ -35,3 +35,9 @@ yarn-error.log*
 *.tmp
 *.temp
 
+# Python 虛擬環境
+venv/
+env/
+ENV/
+.venv/
+
