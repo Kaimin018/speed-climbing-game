@@ -95,7 +95,14 @@
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             display: none; pointer-events: auto; z-index: 10;
         }
-        #mobile-controls.active { display: block; }
+        /* 桌面端永遠隱藏虛擬方向鍵 */
+        @media (min-width: 769px) {
+            #mobile-controls { display: none !important; }
+        }
+        /* 手機端只在遊戲進行時顯示 */
+        @media (max-width: 768px) {
+            #mobile-controls.active { display: block; }
+        }
         .control-pad {
             display: grid; grid-template-columns: repeat(3, 1fr);
             gap: 8px; width: 200px; margin: 0 auto;
@@ -123,11 +130,12 @@
             .label { font-size: 12px; }
             #height-display { font-size: 24px !important; }
             
-            #input-zone { bottom: 140px; padding-bottom: 10px; }
+            /* 手機端：往上移動 sequence 和 next，避免被方向鍵擋住 */
+            #input-zone { bottom: 540px; padding-bottom: 10px; }
             #current-row-container { padding: 12px 20px; border-radius: 15px; }
             .key-box { width: 45px; height: 45px; font-size: 24px; }
             
-            #preview-container { bottom: 20px; right: 20px; padding: 10px; }
+            #preview-container { bottom: 420px; right: 20px; padding: 10px; }
             .preview-key { width: 20px; height: 20px; font-size: 12px; }
             
             #menu-screen { padding: 20px; }
@@ -137,6 +145,16 @@
             #result-overlay { font-size: 32px; }
             
             #mobile-controls { display: block; }
+            
+            /* 手機端：保持 3x3 網格布局，空按鈕透明無邊框但保留占位 */
+            .control-btn.empty {
+                background: transparent !important;
+                border: none !important;
+                backdrop-filter: none !important;
+                box-shadow: none !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
         }
 
         @media (max-width: 480px) {
@@ -144,8 +162,11 @@
             .subtitle { font-size: 16px; }
             button { padding: 12px 30px; font-size: 18px; }
             
-            #input-zone { bottom: 120px; }
+            /* 小螢幕：進一步往上移動 */
+            #input-zone { bottom: 220px; }
             .key-box { width: 40px; height: 40px; font-size: 20px; gap: 8px; }
+            
+            #preview-container { bottom: 220px; }
             
             .control-pad { width: 180px; gap: 6px; }
             .control-btn { width: 55px; height: 55px; font-size: 24px; }
